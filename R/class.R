@@ -57,14 +57,16 @@ setMethod("dbDisconnect", "JDBCConnection", def=function(conn, ...)
 
 .fillStatementParameters <- function(s, l) {
   for (i in 1:length(l)) {
-    if (is.integer(l[[i]]))
-      .jcall(s, "V", "setInt", i, l[[i]][1])
-    else {
-      if (is.numeric(l[[i]]))
-        .jcall(s, "V", "setDouble", i, as.double(l[[i]])[1])
-      else
-        .jcall(s, "V", "setString", i, as.character(l[[i]])[1])
-    }
+    v <- l[[i]]
+    if (is.na(v)) { # map NAs to NULLs (courtesy of Axel Klenk)
+      sqlType <- if (is.integer(v)) 4 else if (is.numeric(v)) 8 else 12
+      .jcall(s, "V", "setNull", i, as.integer(sqlType))
+    } else if (is.integer(v))
+      .jcall(s, "V", "setInt", i, v[1])
+    else if (is.numeric(v))
+      .jcall(s, "V", "setDouble", i, as.double(v)[1])
+    else
+      .jcall(s, "V", "setString", i, as.character(v)[1])
   }
 }
 
@@ -77,7 +79,7 @@ setMethod("dbSendQuery", signature(conn="JDBCConnection", statement="character")
   .verify.JDBC.result(r, "Unable to retrieve JDBC result set for ",statement)
   md <- .jcall(r, "Ljava/sql/ResultSetMetaData;", "getMetaData", check=FALSE)
   .verify.JDBC.result(md, "Unable to retrieve JDBC result set meta data for ",statement, " in dbSendQuery")
-  new("JDBCResult", jr=r, md=md)
+  new("JDBCResult", jr=r, md=md, stat=s)
 })
 
 if (is.null(getGeneric("dbSendUpdate"))) setGeneric("dbSendUpdate", function(conn, statement, ...) standardGeneric("dbSendUpdate"))
@@ -85,6 +87,7 @@ if (is.null(getGeneric("dbSendUpdate"))) setGeneric("dbSendUpdate", function(con
 setMethod("dbSendUpdate",  signature(conn="JDBCConnection", statement="character"),  def=function(conn, statement, ..., list=NULL) {
   s <- .jcall(conn@jc, "Ljava/sql/PreparedStatement;", "prepareStatement", as.character(statement)[1], check=FALSE)
   .verify.JDBC.result(s, "Unable to execute JDBC statement ",statement)
+  on.exit(.jcall(s, "V", "close")) # in theory this is not necesary since 's' will go away and be collected, but appearently it may be too late for Oracle (ORA-01000)
   if (length(list(...))) .fillStatementParameters(s, list(...))
   if (!is.null(list)) .fillStatementParameters(s, list)
   .jcall(s, "I", "executeUpdate", check=FALSE)
@@ -199,8 +202,11 @@ setMethod("dbCommit", "JDBCConnection", def=function(conn, ...) {.jcall(conn@jc,
 setMethod("dbRollback", "JDBCConnection", def=function(conn, ...) {.jcall(conn@jc, "V", "rollback"); TRUE})
 
 ##=== JDBCResult
+## jr - result set, md - metadata, stat - statement
+## Since the life of a result set depends on the life of the statement, we have to explicitly
+## save the later as well (and close both at the end)
 
-setClass("JDBCResult", representation("DBIResult", jr="jobjRef", md="jobjRef"))
+setClass("JDBCResult", representation("DBIResult", jr="jobjRef", md="jobjRef", stat="jobjRef"))
 
 setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n, ...) {
   cols <- .jcall(res@md, "I", "getColumnCount")
@@ -219,9 +225,10 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
   while (.jcall(res@jr, "Z", "next")) {
     j <- j + 1
     for (i in 1:cols) {
-      if (is.numeric(l[[i]]))
-        l[[i]][j] <- .jcall(res@jr, "D", "getDouble", i)
-      else {
+      if (is.numeric(l[[i]])) {
+        a <- l[[i]][j] <- .jcall(res@jr, "D", "getDouble", i)
+        if (a == 0 && .jcall(res@jr, "Z", "wasNull")) l[[i]][j] <- NA
+      } else {
         a <- .jcall(res@jr, "S", "getString", i)
         l[[i]][j] <- if (is.null(a)) NA else a
       }
@@ -235,7 +242,7 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
 })
 
 setMethod("dbClearResult", "JDBCResult",
-          def = function(res, ...) { jcall(res@jr, "V", "close"); TRUE},
+          def = function(res, ...) { .jcall(res@jr, "V", "close"); .jcall(res@stat, "V", "close"); TRUE },
           valueClass = "logical")
 
 setMethod("dbGetInfo", "JDBCResult", def=function(dbObj, ...) list(), valueClass="list")

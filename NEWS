@@ -1,3 +1,17 @@
+0.1-6	2011-03-09
+    *	fix a typo in dbClearResult
+
+    *	map NAs in query parameters into NULLs
+	(thanks to Axel Klenk)
+
+    *	explicitly close statements right away (Oracle seems to need this)
+	(thanks to Axel Klenk)
+
+    *	add "stat" slot (Statement object) to JDBCResult class to make sure
+	the statement lives long enough to not close the result set
+
+    *	convert NULLs into NAs in numeric columns
+
 0.1-5	2007-10-01
     *	instantiate driver's class and use a call to 'connect' as a
 	fall-back if the DriverManager fails to find a proper driver.
