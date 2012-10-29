@@ -43,6 +43,8 @@ setMethod("dbConnect", "JDBCDriver", def=function(drv, url, user='', password=''
     p <- .jnew("java/util/Properties")
     if (length(user)==1 && nchar(user)) .jcall(p,"Ljava/lang/Object;","setProperty","user",user)
     if (length(password)==1 && nchar(password)) .jcall(p,"Ljava/lang/Object;","setProperty","password",password)
+    l <- list(...)
+    if (length(names(l))) for (n in names(l)) .jcall(p, "Ljava/lang/Object;", "setProperty", n, as.character(l[[n]]))
     jc <- .jcall(drv@jdrv, "Ljava/sql/Connection;", "connect", as.character(url)[1], p)
   }
   .verify.JDBC.result(jc, "Unable to connect JDBC to ",url)
@@ -72,12 +74,19 @@ setMethod("dbDisconnect", "JDBCConnection", def=function(conn, ...)
 }
 
 setMethod("dbSendQuery", signature(conn="JDBCConnection", statement="character"),  def=function(conn, statement, ..., list=NULL) {
-  s <- .jcall(conn@jc, "Ljava/sql/PreparedStatement;", "prepareStatement", as.character(statement)[1], check=FALSE)
-  .verify.JDBC.result(s, "Unable to execute JDBC statement ",statement)
-  if (length(list(...))) .fillStatementParameters(s, list(...))
-  if (!is.null(list)) .fillStatementParameters(s, list)
-  r <- .jcall(s, "Ljava/sql/ResultSet;", "executeQuery", check=FALSE)
-  .verify.JDBC.result(r, "Unable to retrieve JDBC result set for ",statement)
+  if (length(list(...)) || length(list)) { ## use prepared statements if there are additional arguments
+    s <- .jcall(conn@jc, "Ljava/sql/PreparedStatement;", "prepareStatement", as.character(statement)[1], check=FALSE)
+    .verify.JDBC.result(s, "Unable to execute JDBC statement ",statement)
+    if (length(list(...))) .fillStatementParameters(s, list(...))
+    if (!is.null(list)) .fillStatementParameters(s, list)
+    r <- .jcall(s, "Ljava/sql/ResultSet;", "executeQuery", check=FALSE)
+    .verify.JDBC.result(r, "Unable to retrieve JDBC result set for ",statement)
+  } else { ## otherwise use a simple statement some DBs fail with the above)
+    s <- .jcall(conn@jc, "Ljava/sql/Statement;", "createStatement")
+    .verify.JDBC.result(s, "Unable to create JDBC statement ",statement)
+    r <- .jcall(s, "Ljava/sql/ResultSet;", "executeQuery", as.character(statement)[1], check=FALSE)
+    .verify.JDBC.result(r, "Unable to retrieve JDBC result set for ",statement)
+  } 
   md <- .jcall(r, "Ljava/sql/ResultSetMetaData;", "getMetaData", check=FALSE)
   .verify.JDBC.result(md, "Unable to retrieve JDBC result set meta data for ",statement, " in dbSendQuery")
   new("JDBCResult", jr=r, md=md, stat=s, pull=.jnull())
@@ -86,18 +95,27 @@ setMethod("dbSendQuery", signature(conn="JDBCConnection", statement="character")
 if (is.null(getGeneric("dbSendUpdate"))) setGeneric("dbSendUpdate", function(conn, statement, ...) standardGeneric("dbSendUpdate"))
 
 setMethod("dbSendUpdate",  signature(conn="JDBCConnection", statement="character"),  def=function(conn, statement, ..., list=NULL) {
-  s <- .jcall(conn@jc, "Ljava/sql/PreparedStatement;", "prepareStatement", as.character(statement)[1], check=FALSE)
-  .verify.JDBC.result(s, "Unable to execute JDBC statement ",statement)
-  on.exit(.jcall(s, "V", "close")) # in theory this is not necesary since 's' will go away and be collected, but appearently it may be too late for Oracle (ORA-01000)
-  if (length(list(...))) .fillStatementParameters(s, list(...))
-  if (!is.null(list)) .fillStatementParameters(s, list)
-  .jcall(s, "I", "executeUpdate", check=FALSE)
+  if (length(list(...)) || length(list)) { ## use prepared statements if there are additional arguments
+    s <- .jcall(conn@jc, "Ljava/sql/PreparedStatement;", "prepareStatement", as.character(statement)[1], check=FALSE)
+    .verify.JDBC.result(s, "Unable to execute JDBC statement ",statement)
+    on.exit(.jcall(s, "V", "close")) # in theory this is not necesary since 's' will go away and be collected, but appearently it may be too late for Oracle (ORA-01000)
+    if (length(list(...))) .fillStatementParameters(s, list(...))
+    if (!is.null(list)) .fillStatementParameters(s, list)
+    .jcall(s, "I", "executeUpdate", check=FALSE)
+  } else {
+    s <- .jcall(conn@jc, "Ljava/sql/Statement;", "createStatement")
+    .verify.JDBC.result(s, "Unable to create JDBC statement ",statement)
+    on.exit(.jcall(s, "V", "close")) # in theory this is not necesary since 's' will go away and be collected, but appearently it may be too late for Oracle (ORA-01000)
+    .jcall(s, "I", "executeUpdate", as.character(statement)[1], check=FALSE)
+  }
   x <- .jgetEx(TRUE)
   if (!is.jnull(x)) stop("execute JDBC update query failed in dbSendUpdate (", .jcall(x, "S", "getMessage"),")")
 })
 
 setMethod("dbGetQuery", signature(conn="JDBCConnection", statement="character"),  def=function(conn, statement, ...) {
   r <- dbSendQuery(conn, statement, ...)
+  ## Teradata needs this - closing the statement also closes the result set according to Java docs
+  on.exit(.jcall(r@stat, "V", "close"))
   fetch(r, -1)
 })
 
@@ -168,8 +186,10 @@ setMethod("dbDataType", signature(dbObj="JDBCConnection", obj = "ANY"),
   paste(quote,s,quote,sep='')
 }
 
-setMethod("dbWriteTable", "JDBCConnection", def=function(conn, name, value, overwrite=TRUE, ...) {
+setMethod("dbWriteTable", "JDBCConnection", def=function(conn, name, value, overwrite=TRUE, append=FALSE, ...) {
   ac <- .jcall(conn@jc, "Z", "getAutoCommit")
+  overwrite <- isTRUE(as.logical(overwrite))
+  append <- if (overwrite) FALSE else isTRUE(as.logical(append))
   if (is.vector(value) && !is.list(value)) value <- data.frame(x=value)
   if (length(value)<1) stop("value must have at least one column")
   if (is.null(names(value))) names(value) <- paste("V",1:length(value),sep='')
@@ -181,16 +201,18 @@ setMethod("dbWriteTable", "JDBCConnection", def=function(conn, name, value, over
   fts <- sapply(value, dbDataType, dbObj=conn)
   if (dbExistsTable(conn, name)) {
     if (overwrite) dbRemoveTable(conn, name)
-    else stop("Table `",name,"' already exists")
-  }
+    else if (!append) stop("Table `",name,"' already exists")
+  } else if (append) stop("Cannot append to a non-existing table `",name,"'")
   fdef <- paste(.sql.qescape(names(value), TRUE, conn@identifier.quote),fts,collapse=',')
   qname <- .sql.qescape(name, TRUE, conn@identifier.quote)
-  ct <- paste("CREATE TABLE ",qname," (",fdef,")",sep= '')
   if (ac) {
     .jcall(conn@jc, "V", "setAutoCommit", FALSE)
     on.exit(.jcall(conn@jc, "V", "setAutoCommit", ac))
   }
-  dbSendUpdate(conn, ct)
+  if (!append) {
+    ct <- paste("CREATE TABLE ",qname," (",fdef,")",sep= '')
+    dbSendUpdate(conn, ct)
+  }
   if (length(value[[1]])) {
     inss <- paste("INSERT INTO ",qname," VALUES(", paste(rep("?",length(value)),collapse=','),")",sep='')
     for (j in 1:length(value[[1]]))

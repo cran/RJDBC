@@ -1,12 +1,4 @@
-# Default NAMESPACE created by R
-# Remove the previous line if you edit this file
-
-# Export all names
-exportPattern(".")
-
-# Import all packages listed as Imports or Depends
-import(
-  methods,
-  DBI,
-  rJava
-)
+exportClasses(JDBCDriver, JDBCConnection, JDBCResult)
+import(DBI)
+exportMethods(dbClearResult,dbColumnInfo,dbCommit,dbConnect,dbDataType,dbDisconnect,dbExistsTable,dbGetException,dbGetInfo,dbGetQuery,dbListConnections,dbListFields,dbListResults,dbListTables,dbReadTable,dbRemoveTable,dbRollback,dbSendQuery,dbSendUpdate,dbUnloadDriver,dbWriteTable,fetch)
+export(JDBC)
