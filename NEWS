@@ -1,3 +1,7 @@
+0.2-3	2013-12-12
+    *	fix duplicate connection object (issue #1)
+
+
 0.2-2	2013-12-03
     *	add dbGetTables() and dbGetFields() which are similar to
 	dbListTable() and dbListFields() but return a full data frame
