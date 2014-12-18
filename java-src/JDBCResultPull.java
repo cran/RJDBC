@@ -61,11 +61,18 @@ public class JDBCResultPull {
     /** fetch records from the result set into column arrays. It
      * replaces any existing data in the buffers.
      * @param atMost the maximum number of rows to be retrieved
+     * @param fetchSize fetch size hint to be sent to the driver. Note
+     * that some databases don't support fetch sizes larger than
+     * 32767. If less than 1 the fetch size is not changed.
      * @return number of rows retrieved
      */
-    public int fetch(int atMost) throws java.sql.SQLException {
+    public int fetch(int atMost, int fetchSize) throws java.sql.SQLException {
 	setCapacity(atMost);
-    rs.setFetchSize(atMost);
+	if (fetchSize > 0) {
+	    try { // run in a try since it's a hint, but some bad drivers fail on it anyway (see #11)
+		rs.setFetchSize(fetchSize);
+	    } catch (java.sql.SQLException e) { } // we can't use SQLFeatureNotSupportedException because that's 1.6+ only
+	}
 	count = 0;
 	while (rs.next()) {
 	    for (int i = 0; i < cols; i++)

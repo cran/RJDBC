@@ -1,5 +1,18 @@
+0.2-5	2014-12-18
+    *	fix bug in dbUnloadDriver() returning NULL instead of FALSE
+
+    *	added block argument to fetch() currently defaulting to 2048
+	which controls the fetch size.
+	Note that 0.2-4 has set this to the stride which was much too
+	big for some databases therefore it is now configurable.
+	(issue #10)
+
+    *	recover if setFetchSize() fails since some drivers don't take
+	it as a hint and fail regardless (issue #11)
+
+
 0.2-4	2014-06-26
-    *	set fetch size to match teh capacity for better performance
+    *	set fetch size to match the capacity for better performance
 	with some drivers. (thanks Jesse Rohland)
 
     *	close DB objects explicitly (issue #4) to avoid Oracle DB
