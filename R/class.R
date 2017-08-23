@@ -306,9 +306,10 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
     .verify.JDBC.result(rp, "cannot instantiate JDBCResultPull hepler class")
   }
   if (n < 0L) { ## infinite pull
-    print(length(l))
+    
     stride <- 32768L  ## start fairly small to support tiny queries and increase later
     while ((nrec <- .jcall(rp, "I", "fetch", stride, block)) > 0L) {
+      print(length(l[[1]]))
       for (i in seq.int(cols))
         l[[i]] <- c(l[[i]], if (cts[i] == 1L) .jcall(rp, "[D", "getDoubles", i) else .jcall(rp, "[Ljava/lang/String;", "getStrings", i))
       if (nrec < stride) break
