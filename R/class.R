@@ -335,7 +335,8 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
   ## as.data.frame is expensive - create it on the fly from the list
   # attr(l, "row.names") <- c(NA_integer_, length(l[[1]]))
   # class(l) <- "data.frame"
-  l_container[[1:l_container_used_elements]]
+  # l_container[[1:l_container_used_elements]]
+  l_container
 })
 
 setMethod("dbClearResult", "JDBCResult",
