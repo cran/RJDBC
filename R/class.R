@@ -133,11 +133,11 @@ setMethod("dbSendUpdate",  signature(conn="JDBCConnection", statement="character
   if (!is.jnull(x)) stop("execute JDBC update query failed in dbSendUpdate (", .jcall(x, "S", "getMessage"),")")
 })
 
-setMethod("dbGetQuery", signature(conn="JDBCConnection", statement="character"),  def=function(conn, statement,  userStride = 32768L, ...) {
+setMethod("dbGetQuery", signature(conn="JDBCConnection", statement="character"),  def=function(conn, statement, ...) {
   r <- dbSendQuery(conn, statement, ...)
   ## Teradata needs this - closing the statement also closes the result set according to Java docs
   on.exit(.jcall(r@stat, "V", "close"))
-  fetch(r, -1,  userStride = 32768L)
+  fetch(r, -1,  userStride = )
 })
 
 setMethod("dbGetException", "JDBCConnection",
@@ -284,7 +284,7 @@ setMethod("dbRollback", "JDBCConnection", def=function(conn, ...) {.jcall(conn@j
 
 setClass("JDBCResult", representation("DBIResult", jr="jobjRef", md="jobjRef", stat="jobjRef", pull="jobjRef"))
 
-setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n, userStride = 32768L ,block=2048L,...) {
+setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n, block=2048L,...) {
   cols <- .jcall(res@md, "I", "getColumnCount")
   block <- as.integer(block)
   if (length(block) != 1L) stop("invalid block size")
@@ -312,11 +312,10 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
   }
   if (n < 0L) { ## infinite pull
     
-    stride <- userStride  ## Let user configure stride
+    stride <- 32768L
     while ((nrec <- .jcall(rp, "I", "fetch", stride, block)) > 0L) {
       
       l_container_used_elements <- l_container_used_elements + 1L
-      # print(l_container_used_elements)
       l <- l_template
       
       for (i in seq.int(cols)){
@@ -324,7 +323,7 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
       }
       l_container[[l_container_used_elements]] <- l
       if (nrec < stride) break
-      stride <- max(userStride,524288L) # 512k
+      stride <- 524288L # 512k
     }
   } else {
     nrec <- .jcall(rp, "I", "fetch", as.integer(n), block)
