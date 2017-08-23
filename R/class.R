@@ -289,13 +289,11 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
   block <- as.integer(block)
   if (length(block) != 1L) stop("invalid block size")
   if (cols < 1L) return(NULL)
-  
-  
   l_template <- list() ## Original allocation of l
   
-  l_container <- list()
+  l_container <- list() ## Creae a list for our result lists
   length(l_container) <- 1024 ## Allocate a length for the number of blocks it might take to pull back
-  l_container_used_elements <- 0L
+  l_container_used_elements <- 0L 
   
   cts <- rep(0L, cols)
   for (i in 1:cols) {
@@ -321,8 +319,9 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
       print(l_container_used_elements)
       l <- l_template
       
-      for (i in seq.int(cols))
+      for (i in seq.int(cols)){
         l[[i]] <- if (cts[i] == 1L) .jcall(rp, "[D", "getDoubles", i) else .jcall(rp, "[Ljava/lang/String;", "getStrings", i)
+      }
       l_container[[l_container_used_elements]] <- l
       if (nrec < stride) break
       stride <- 524288L # 512k
@@ -335,9 +334,9 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
   ## as.data.frame is expensive - create it on the fly from the list
   # attr(l, "row.names") <- c(NA_integer_, length(l[[1]]))
   # class(l) <- "data.frame"
-  # l_container[[1:l_container_used_elements]]
-  l_container
-}, valueClass = "list")
+  
+  data.table::rbindlist(l_container[1:l_container_used_elements])
+})
 
 setMethod("dbClearResult", "JDBCResult",
           def = function(res, ...) { .jcall(res@jr, "V", "close"); .jcall(res@stat, "V", "close"); TRUE },
