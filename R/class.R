@@ -316,19 +316,20 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
     while ((nrec <- .jcall(rp, "I", "fetch", stride, block)) > 0L) {
       
       l_container_used_elements <- l_container_used_elements + 1L
-      l <- l_template
+      l_container[[l_container_used_elements]] <- l_template
       
       for (i in seq.int(cols)){
-        l[[i]] <- if (cts[i] == 1L) .jcall(rp, "[D", "getDoubles", i) else .jcall(rp, "[Ljava/lang/String;", "getStrings", i)
+        l_container[[l_container_used_elements]][[i]] <- if (cts[i] == 1L) .jcall(rp, "[D", "getDoubles", i) else .jcall(rp, "[Ljava/lang/String;", "getStrings", i)
       }
-      l_container[[l_container_used_elements]] <- l
+      
       if (nrec < stride) break
       stride <- 524288L # 512k
     }
   } else {
     nrec <- .jcall(rp, "I", "fetch", as.integer(n), block)
-    for (i in seq.int(cols)) l[[i]] <- if (cts[i] == 1L) .jcall(rp, "[D", "getDoubles", i) else .jcall(rp, "[Ljava/lang/String;", "getStrings", i)
-    l_container[[l_container_used_elements]] <- l
+    for (i in seq.int(cols)) {
+      l_container[[l_container_used_elements]][[i]] <- if (cts[i] == 1L) .jcall(rp, "[D", "getDoubles", i) else .jcall(rp, "[Ljava/lang/String;", "getStrings", i)
+    }
   }
 
   data.table::rbindlist(l_container[1:l_container_used_elements])
