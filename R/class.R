@@ -285,6 +285,7 @@ setMethod("dbRollback", "JDBCConnection", def=function(conn, ...) {.jcall(conn@j
 setClass("JDBCResult", representation("DBIResult", jr="jobjRef", md="jobjRef", stat="jobjRef", pull="jobjRef"))
 
 setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n, block=2048L, ...) {
+  print("Matt Github Branch")
   cols <- .jcall(res@md, "I", "getColumnCount")
   block <- as.integer(block)
   if (length(block) != 1L) stop("invalid block size")
@@ -346,3 +347,4 @@ setMethod("dbColumnInfo", "JDBCResult", def = function(res, ...) {
 },
           valueClass = "data.frame")
 
+## MS
