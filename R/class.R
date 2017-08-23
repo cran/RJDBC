@@ -285,7 +285,6 @@ setMethod("dbRollback", "JDBCConnection", def=function(conn, ...) {.jcall(conn@j
 setClass("JDBCResult", representation("DBIResult", jr="jobjRef", md="jobjRef", stat="jobjRef", pull="jobjRef"))
 
 setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n, block=2048L, ...) {
-  print("Matt Github Branch")
   cols <- .jcall(res@md, "I", "getColumnCount")
   block <- as.integer(block)
   if (length(block) != 1L) stop("invalid block size")
@@ -307,6 +306,7 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
     .verify.JDBC.result(rp, "cannot instantiate JDBCResultPull hepler class")
   }
   if (n < 0L) { ## infinite pull
+    print(length(l))
     stride <- 32768L  ## start fairly small to support tiny queries and increase later
     while ((nrec <- .jcall(rp, "I", "fetch", stride, block)) > 0L) {
       for (i in seq.int(cols))
