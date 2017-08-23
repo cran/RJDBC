@@ -346,3 +346,4 @@ setMethod("dbColumnInfo", "JDBCResult", def = function(res, ...) {
 },
           valueClass = "data.frame")
 
+## MS
