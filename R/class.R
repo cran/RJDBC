@@ -313,6 +313,7 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
   if (n < 0L) { ## infinite pull
     stride <- 32768L
     while ((nrec <- .jcall(rp, "I", "fetch", stride, block)) > 0L) {
+
       l_container_used_elements <- l_container_used_elements + 1L ## iterate through the list of chunck containers
       l_container[[l_container_used_elements]] <- l_template ## create template with names and types for each chunk
       for (i in seq.int(cols)){
