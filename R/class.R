@@ -137,7 +137,7 @@ setMethod("dbGetQuery", signature(conn="JDBCConnection", statement="character"),
   r <- dbSendQuery(conn, statement, ...)
   ## Teradata needs this - closing the statement also closes the result set according to Java docs
   on.exit(.jcall(r@stat, "V", "close"))
-  fetch(r, -1,  userStride = )
+  fetch(r, -1)
 })
 
 setMethod("dbGetException", "JDBCConnection",
@@ -284,16 +284,16 @@ setMethod("dbRollback", "JDBCConnection", def=function(conn, ...) {.jcall(conn@j
 
 setClass("JDBCResult", representation("DBIResult", jr="jobjRef", md="jobjRef", stat="jobjRef", pull="jobjRef"))
 
-setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n, block=2048L,...) {
+setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n, block=2048L, ...) {
   cols <- .jcall(res@md, "I", "getColumnCount")
   block <- as.integer(block)
   if (length(block) != 1L) stop("invalid block size")
   if (cols < 1L) return(NULL)
-  l_template <- list() ## Original allocation of l
   
+  l_template <- list() ## Original allocation of l
   l_container <- list() ## Creae a list for our result lists
-  length(l_container) <- 1024 ## Allocate a length for the number of blocks it might take to pull back
-  l_container_used_elements <- 0L 
+  length(l_container) <- 1024 ## Allocate a length for the number of blocks it might take to pull back, this should probably not be hardcoded
+  l_container_used_elements <- 0L ## Start counter at 0
   
   cts <- rep(0L, cols)
   for (i in 1:cols) {
@@ -311,17 +311,13 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
     .verify.JDBC.result(rp, "cannot instantiate JDBCResultPull hepler class")
   }
   if (n < 0L) { ## infinite pull
-    
     stride <- 32768L
     while ((nrec <- .jcall(rp, "I", "fetch", stride, block)) > 0L) {
-      
-      l_container_used_elements <- l_container_used_elements + 1L
-      l_container[[l_container_used_elements]] <- l_template
-      
+      l_container_used_elements <- l_container_used_elements + 1L ## iterate through the list of chunck containers
+      l_container[[l_container_used_elements]] <- l_template ## create template with names and types for each chunk
       for (i in seq.int(cols)){
         l_container[[l_container_used_elements]][[i]] <- if (cts[i] == 1L) .jcall(rp, "[D", "getDoubles", i) else .jcall(rp, "[Ljava/lang/String;", "getStrings", i)
       }
-      
       if (nrec < stride) break
       stride <- 524288L # 512k
     }
@@ -331,7 +327,6 @@ setMethod("fetch", signature(res="JDBCResult", n="numeric"), def=function(res, n
       l_container[[l_container_used_elements]][[i]] <- if (cts[i] == 1L) .jcall(rp, "[D", "getDoubles", i) else .jcall(rp, "[Ljava/lang/String;", "getStrings", i)
     }
   }
-
   data.table::rbindlist(l_container[1:l_container_used_elements])
 })
 
@@ -357,5 +352,3 @@ setMethod("dbColumnInfo", "JDBCResult", def = function(res, ...) {
   as.data.frame(l, row.names=1:cols)    
 },
           valueClass = "data.frame")
-
-## MS
