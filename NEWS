@@ -1,3 +1,23 @@
+0.2-7	2018-01-24
+    *	cosmetic changes to appease CRAN
+
+
+0.2-6	2018-01-05
+    *	move java-src to java
+
+    *	add schema= argument to dbGetTables() and dbListTables()
+
+    *	support vectorized version of dbSendUpdate() which uses
+	batch-inserts for more efficient loading. Note that only
+	prepared statements work for now.
+
+    *	use column labels instead of names (#36)
+
+    *	dbColumnInfo() will return the column label in `name' and
+	column name in `field.name' (which is optional, for
+	compatbility).
+
+
 0.2-5	2014-12-18
     *	fix bug in dbUnloadDriver() returning NULL instead of FALSE
 
