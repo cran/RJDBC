@@ -1,6 +1,7 @@
 \name{JDBCConnection-methods}
 \docType{methods}
 \alias{JDBCConnection-methods}
+\alias{dbBegin,JDBCConnection-method}
 \alias{dbCommit,JDBCConnection-method}
 \alias{dbDataType,JDBCConnection-method}
 \alias{dbDisconnect,JDBCConnection-method}
@@ -55,6 +56,7 @@ dbGetFields (conn, ...)
 }
 \section{Methods}{
   \describe{
+    \item{dbBegin}{\code{signature(conn = "JDBCConnection", ...)}}
     \item{dbCommit}{\code{signature(conn = "JDBCConnection", ...)}}
     \item{dbDataType}{\code{signature(dbObj = "JDBCConnection", obj =
 	"ANY", ...)}}
@@ -80,5 +82,41 @@ dbGetFields (conn, ...)
     \item{dbWriteTable}{\code{signature(conn = "JDBCConnection", ...)}}
 
 }}
-\keyword{methods}
+\details{
+  Some notable enhancements to the DBI API:
 
+  \code{dbSendUpdate} supports vectorized arguments which is far more
+  efficient than using scalar updates. Example:
+  \code{dbSendUpdate(c, "INSERT INTO myTable VALUES(?, ?)", rnorm(1000), runif(1000))}
+  performs a single JDBC \code{batchExecute()} call. Additional
+  parameter \code{max.batch=10000L} is an integer that specifies the
+  maximum batch size supported by the DBMS.
+
+  \code{dbSendQuery} and \code{dbSendUpdate} accept both \code{...}
+  (populated frist) as well as \code{list=} (populated as second).
+  Only unnamed arguments are used from \code{...} (assuming that those
+  are function arguments and no data) while all elements are used from
+  \code{list=}.
+
+  \code{dbGetQuery} is a shorthand for \code{sendQuery} +
+  \code{fetch}. Parameters \code{n=-1}, \code{block=2048L} and
+  \code{use.label=TRUE} are passed through to \code{fetch()} others to
+  \code{dbSendQuery}.
+
+  \code{dbListTables} and \code{dbGetTables} have the arguments
+  \code{(conn, pattern="\%", schema=NULL)}. \code{dbExistsTable} is just
+  a wrapper for \code{dbGetTables}.
+
+  \code{dbWriteTable} is defined as
+  \code{(conn, name, value, overwrite=FALSE, append=FALSE, force=FALSE, ..., max.batch=10000L)}
+  and is just a short-hand for the corresponding \code{dbSendUpdate()}
+  statements. Since it is only a convenience wrapper, it is strongly
+  recommended to use \code{dbSendUpdate()} in any real use-cases
+  as you have far more control over the shape and properties of the
+  table if you issue the \code{CREATE TABLE} statement according to
+  your DBMS' capabilities.
+
+  \code{dbReadTable} is just a shorthand for
+  \code{dbGetQuery(c, "SELECT * from <table>")}
+}
+\keyword{methods}

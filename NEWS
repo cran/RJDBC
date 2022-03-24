@@ -1,3 +1,69 @@
+0.2-10	2022-03-24
+    *	dbSendQuery() and dbSendUpdate() now remove named arguments
+	only from `...` but not from `list=` to enable single-row
+	updates from data frames along the lines of `list=iris[1,]`.
+
+    *	dbWriteTable() failed for data frames with exactly one row,
+	because it used the form shown above for updates which will
+	fail with `JDBC ERROR: Parameter at position 1 is not set`
+	since all elements are named and thus none were set.
+
+    *	merging arguments from `...` and `list=` was not always done
+	correctly, in some cases `list=` would overwrite `...`
+	arguments.
+
+	(Note: all of the above are 0.2-9 regressions related to the
+	changes in handling of prepared statement arguments)
+
+    *	add dbIsValid() methods for JDBCConnection and JDBCResult (#89)
+
+
+0.2-9	2022-03-16
+    *	All Java-related errors are signalled by throwing error
+	conditions. If a Java error occurred, the condition will be of
+	the class JDBC.exception with the Java class names of the
+	excption as subclasses. Such objects have following slots:
+	 - desc: string, description of the operation error
+	 - jex: Java object, reference to the Java exception object
+	 - statement: string (or NULL), executed statement
+	This allows the programmatic use of tryCatch() to selectively
+	catch exceptions and/or to use further Java utilities, such as
+	e$jex$printStackTrace()
+
+    *	add `schema=` to `dbExistsTable()` (#84)
+
+    *	check precision of numeric types and revert to string
+	representation if it is more than 15 to avoid loss of
+	precision at conversion time. (#83)
+
+    *	`NA`s are supported in updates (#64)
+
+    *	add `findDrivers()` function which uses Java Service Provider
+	mechanism (in Java 1.6 and higher) to find all JDBC driver
+	classes on the class path.
+
+    *	dbConnection() used to always try DriverManager first
+	(without properties) and only on failure it would use the
+	driver. However, DriverManager is static and never updates the
+	driver list, so it is inherently unreliable. Therefore we now
+	prefer the driver if specified and DriverManager will only be
+	used if the driver is NULL. (inspired by #45)
+
+    *	Use collect + join when `fetch()`ing results of unknown
+	length. This should improve performance for fetching results
+	with large number of rows. (mentioned in #50)
+
+    *	Named arguments are removed from `dbSendUpdate` and query
+	calls when populating prepared statements to allow for future
+	named arguments in the methods.
+
+    *	`dbBegin()` is implemented to disable auto-commit. Analogously,
+	`dbRollback()` and `dbCommit()` perform the corresponding
+	function and then re-enable auto-commit. (see also #58)
+
+    *	`dbReadTable()` passes ... through to `dbGetQuery`
+
+
 0.2-8	2020-03-06
     *	re-use Java helper for subsequent fetch() calls on the same
 	result set which should make them more efficient.
